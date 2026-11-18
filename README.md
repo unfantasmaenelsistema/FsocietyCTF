@@ -64,6 +64,108 @@ Hay extras para quien explore: borrar huellas antes de salir mejora el rango, y 
 
 ![Pantalla de victoria](docs/capturas/04-victoria.png)
 
+## Pistas y lecciones por fase
+
+Este juego no tiene *writeup*: la gracia está en encontrar el camino. Si te atascas, abre la fase y lee las pistas **de una en una**: cada una orienta un poco más que la anterior, pero ninguna da el comando ni la respuesta. Debajo está la lección defensiva: qué falló en ECorp y cómo se evita en un sistema real.
+
+<details>
+<summary><strong>Fase 1 · Brecha perimetral</strong> — el portal web de ECorp</summary>
+
+**Pistas**
+1. Antes de atacar nada, averigua qué ofrece el objetivo: qué puertos responden y qué servicio hay detrás de cada uno.
+2. La dirección del portal lleva un parámetro. Piensa qué hace el servidor con ese valor cuando lo recibe.
+3. Una herramienta automática puede comprobar si ese parámetro llega tal cual a la base de datos. Después, ve de lo general (qué bases hay) a lo concreto (qué tabla te interesa).
+
+**Lección defensiva**
+- Consultas **parametrizadas** o procedimientos almacenados: el valor del usuario nunca se concatena en la sentencia SQL.
+- La cuenta con la que la web accede a la base de datos tiene solo los permisos que necesita (mínimo privilegio).
+- Contraseñas guardadas con un hash lento y con sal (bcrypt, Argon2), nunca en claro ni con MD5.
+- Un WAF y la monitorización de errores SQL detectan los intentos a tiempo.
+
+</details>
+
+<details>
+<summary><strong>Fase 2 · Red interna</strong> — la impresora de la subred</summary>
+
+**Pistas**
+1. Ya estás dentro: lo primero es saber qué más hay en la subred.
+2. Entre los equipos descubiertos hay uno que nadie vigila mucho. Mira qué servicios tiene abiertos.
+3. Algunos servicios de transferencia de ficheros dejan entrar a cualquiera sin cuenta propia. Lo que encuentres ahí puede servir más adelante.
+
+**Lección defensiva**
+- Desactivar el acceso anónimo y los servicios que no se usan, también en impresoras y equipos «tontos».
+- Segmentar la red: los periféricos en su propia VLAN, sin alcance a los servidores.
+- Inventario de activos: no se puede proteger lo que no se sabe que existe.
+- Usar protocolos cifrados (SFTP, FTPS) en lugar de FTP en claro.
+
+</details>
+
+<details>
+<summary><strong>Fase 3 · Servidor de seguridad</strong> — el control de accesos</summary>
+
+**Pistas**
+1. Los recursos compartidos de Windows también se pueden listar. Pregunta al servidor qué comparte y con quién.
+2. Entre lo compartido hay datos que no deberían estar ahí: algo relacionado con las tarjetas de acceso del personal.
+3. Una tarjeta de proximidad sencilla solo transmite un identificador. Si lo conoces, piensa qué te impide fabricar otra igual.
+
+**Lección defensiva**
+- Revisar los permisos de los recursos compartidos: nada accesible para invitados o para «Todos».
+- Las copias de seguridad y los volcados de configuración, cifrados y fuera de los recursos compartidos.
+- Tarjetas con autenticación criptográfica (por ejemplo, MIFARE DESFire) en lugar de las de solo identificador, que se clonan en segundos.
+- Doble factor en las puertas críticas: tarjeta y PIN, o biometría.
+
+</details>
+
+<details>
+<summary><strong>Fase 4 · Despacho del CEO</strong> — la estación de trabajo</summary>
+
+**Pistas**
+1. El objetivo de la fase te dice qué usuario buscas. Falta su contraseña, y las personas eligen contraseñas muy predecibles.
+2. Hay listas públicas con millones de contraseñas reales filtradas. Pruébalas contra el servicio de acceso remoto, pero recuerda que cada intento hace ruido.
+3. Una vez dentro, hay un texto que parece aleatorio pero solo está **codificado**, no cifrado. Los caracteres que usa te dicen qué codificación es.
+
+**Lección defensiva**
+- Bloqueo o retardo tras varios intentos fallidos (fail2ban, políticas de bloqueo) y alertas al SOC.
+- Acceso remoto con **claves** en lugar de contraseñas, o con doble factor; nunca expuesto sin VPN.
+- Contraseñas largas comprobadas contra listas de contraseñas filtradas.
+- Base64 no protege nada: los secretos se cifran o se guardan en un gestor de secretos.
+
+</details>
+
+<details>
+<summary><strong>Fase 5 · Perímetro exterior</strong> — la alarma y la cámara IP</summary>
+
+**Pistas**
+1. Para entrar en la red del vigilante, primero necesitas sus credenciales. Piensa cómo lograr que te las escriba él mismo en una página que parezca legítima.
+2. El sistema de alarma tiene una interfaz pensada para máquinas, no para personas. Comprueba si exige algo para aceptar órdenes.
+3. Los dispositivos IoT salen de fábrica con usuario y contraseña conocidos. Pregúntate si alguien los cambió al instalar la cámara.
+
+**Lección defensiva**
+- Wi-Fi corporativa con WPA2/WPA3-Enterprise (802.1X) y formación para no introducir credenciales en portales inesperados.
+- Detección de puntos de acceso falsos (WIPS).
+- Toda API exige autenticación y autorización, también las «internas».
+- Cambiar las credenciales por defecto al instalar cualquier dispositivo, actualizar su firmware y aislarlo en su propia red.
+
+</details>
+
+<details>
+<summary><strong>Fase 6 · Cámara acorazada</strong> — el controlador de la bóveda</summary>
+
+**Pistas**
+1. El controlador tiene un puerto físico de mantenimiento. Averigua cómo se presenta en el sistema.
+2. Para hablar con él necesitas un programa de terminal serie y los parámetros correctos de la conexión.
+3. El código maestro no está en esta fase: lo conseguiste antes. Repasa lo que has ido encontrando.
+
+**Lección defensiva**
+- Los puertos de depuración y mantenimiento (serie, JTAG, USB) se deshabilitan o se protegen en producción.
+- Seguridad física: el acceso a la sala y al hardware también es un control de seguridad.
+- Un secreto que abre la bóveda no puede reutilizarse ni quedar guardado en otro sistema.
+- Registro y alertas de cualquier acceso al controlador.
+
+</details>
+
+> **Para el profesorado:** las seis fases se pueden plantear como un ejercicio de *defensa*. Tras jugar, cada grupo redacta para una fase qué control habría cortado la cadena y cómo se habría detectado el ataque en los registros.
+
 ## Ejecutarlo en local
 
 Requiere [Bun](https://bun.sh/) (o Node.js 20+ con npm).
